@@ -1,0 +1,13 @@
+{
+  "name": "e-voting-system",
+  "version": "1.0.0",
+  "description": "This is a secure, end-to-end verifiable e-voting system implementing modern cryptographic protocols including WebAuthn/FIDO2 authentication, ECIES ballot encryption, threshold ElGamal homomorphic encryption, and mix-net privacy protection.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
