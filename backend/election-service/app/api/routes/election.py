@@ -209,3 +209,74 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         total_voters=total_voters,
         pending_kyc=pending_kyc
     )
+
+
+class UpdateStatusRequest(BaseModel):
+    status: str
+
+    class Config:
+        # Validate status values
+        schema_extra = {
+            "example": {
+                "status": "ACTIVE"
+            }
+        }
+
+
+@router.put("/{election_id}/status")
+def update_election_status(
+    election_id: str, 
+    payload: UpdateStatusRequest, 
+    db: Session = Depends(get_db)
+):
+    """
+    Update election status.
+    
+    Valid statuses:
+    - DRAFT: Election is being prepared (can edit candidates, details)
+    - ACTIVE: Election is open for voting (cannot edit)
+    - CLOSED: Election has ended, waiting for tallying
+    - TALLIED: Results have been calculated and published
+    
+    Status transitions:
+    - DRAFT → ACTIVE (start election)
+    - ACTIVE → CLOSED (end election)
+    - CLOSED → TALLIED (publish results)
+    - Any → DRAFT (reset/reopen for editing - use with caution)
+    """
+    # Validate status
+    valid_statuses = ['DRAFT', 'ACTIVE', 'CLOSED', 'TALLIED']
+    if payload.status not in valid_statuses:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+        )
+    
+    # Check if election exists
+    election = db.execute(
+        text("SELECT status FROM elections WHERE election_id::text = :eid"),
+        {"eid": election_id}
+    ).fetchone()
+    
+    if not election:
+        raise HTTPException(status_code=404, detail="Election not found")
+    
+    current_status = election[0]
+    
+    # Update status
+    db.execute(
+        text("""
+        UPDATE elections 
+        SET status = :status, updated_at = CURRENT_TIMESTAMP 
+        WHERE election_id::text = :eid
+        """),
+        {"status": payload.status, "eid": election_id}
+    )
+    db.commit()
+    
+    return {
+        "message": f"Election status updated from {current_status} to {payload.status}",
+        "election_id": election_id,
+        "old_status": current_status,
+        "new_status": payload.status
+    }
