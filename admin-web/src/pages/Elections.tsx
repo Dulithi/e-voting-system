@@ -40,6 +40,8 @@ interface Election {
   start_time: string
   end_time: string
   status: string
+  threshold_t: number
+  total_trustees_n: number
 }
 
 export default function Elections() {
@@ -47,12 +49,16 @@ export default function Elections() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [openDialog, setOpenDialog] = useState(false)
+  const [openEditDialog, setOpenEditDialog] = useState(false)
+  const [editingElection, setEditingElection] = useState<Election | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     start_time: '',
     end_time: '',
+    threshold_t: 5,
+    total_trustees_n: 9,
   })
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [selectedElection, setSelectedElection] = useState<string | null>(null)
@@ -87,7 +93,14 @@ export default function Elections() {
       setSubmitting(true)
       await electionApi.post('/election/create', formData)
       setOpenDialog(false)
-      setFormData({ title: '', description: '', start_time: '', end_time: '' })
+      setFormData({ 
+        title: '', 
+        description: '', 
+        start_time: '', 
+        end_time: '',
+        threshold_t: 5,
+        total_trustees_n: 9,
+      })
       loadElections()
     } catch (error: any) {
       console.error('Failed to create election:', error)
@@ -121,6 +134,48 @@ export default function Elections() {
       alert(error.response?.data?.detail || 'Failed to update election status')
     } finally {
       setUpdatingStatus(false)
+    }
+  }
+
+  const handleEdit = (election: Election) => {
+    setEditingElection(election)
+    setFormData({
+      title: election.title,
+      description: election.description || '',
+      start_time: election.start_time.substring(0, 16), // Format for datetime-local
+      end_time: election.end_time.substring(0, 16),
+      threshold_t: election.threshold_t,
+      total_trustees_n: election.total_trustees_n,
+    })
+    setOpenEditDialog(true)
+    handleMenuClose()
+  }
+
+  const handleUpdate = async () => {
+    if (!editingElection || !formData.title.trim() || !formData.start_time || !formData.end_time) {
+      alert('Please fill in all required fields')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      await electionApi.put(`/election/${editingElection.election_id}`, formData)
+      setOpenEditDialog(false)
+      setEditingElection(null)
+      setFormData({ 
+        title: '', 
+        description: '', 
+        start_time: '', 
+        end_time: '',
+        threshold_t: 5,
+        total_trustees_n: 9,
+      })
+      loadElections()
+    } catch (error: any) {
+      console.error('Failed to update election:', error)
+      alert(error.response?.data?.detail || 'Failed to update election')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -242,7 +297,30 @@ export default function Elections() {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem disabled sx={{ opacity: 1 }}>
+        <MenuItem 
+          onClick={() => {
+            const election = elections.find(e => e.election_id === selectedElection)
+            if (election) handleEdit(election)
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={1}>
+            <EditIcon fontSize="small" />
+            <Typography variant="body2">Edit Election</Typography>
+          </Box>
+        </MenuItem>
+        {elections.find(e => e.election_id === selectedElection)?.status === 'TALLIED' && (
+          <MenuItem 
+            onClick={() => {
+              handleMenuClose()
+              navigate(`/results/${selectedElection}`)
+            }}
+          >
+            <Box display="flex" alignItems="center" gap={1}>
+              <Typography variant="body2">📊 View Results</Typography>
+            </Box>
+          </MenuItem>
+        )}
+        <MenuItem disabled sx={{ opacity: 1, mt: 1 }}>
           <Typography variant="caption" color="text.secondary">
             Change Status
           </Typography>
@@ -311,6 +389,68 @@ export default function Elections() {
             onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
             disabled={submitting}
           />
+          
+          <Box sx={{ mt: 2, mb: 1 }}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              🔐 Threshold Cryptography Settings
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+              These settings control how many trustees are needed to decrypt election results.
+            </Typography>
+          </Box>
+
+          <Grid container spacing={2}>
+            <Grid item xs={6}>
+              <Tooltip title="Minimum number of trustees needed to decrypt results. Lower = less secure but more fault-tolerant.">
+                <TextField
+                  margin="dense"
+                  label="Threshold (t)"
+                  type="number"
+                  fullWidth
+                  required
+                  value={formData.threshold_t}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 1
+                    setFormData({ 
+                      ...formData, 
+                      threshold_t: Math.max(1, Math.min(val, formData.total_trustees_n))
+                    })
+                  }}
+                  disabled={submitting}
+                  inputProps={{ min: 1, max: formData.total_trustees_n }}
+                  helperText="Min trustees to decrypt"
+                />
+              </Tooltip>
+            </Grid>
+            <Grid item xs={6}>
+              <Tooltip title="Total number of trustees. Must be >= threshold. More trustees = better redundancy.">
+                <TextField
+                  margin="dense"
+                  label="Total Trustees (n)"
+                  type="number"
+                  fullWidth
+                  required
+                  value={formData.total_trustees_n}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 1
+                    setFormData({ 
+                      ...formData, 
+                      total_trustees_n: Math.max(formData.threshold_t, val)
+                    })
+                  }}
+                  disabled={submitting}
+                  inputProps={{ min: formData.threshold_t }}
+                  helperText="Total trustee shares"
+                />
+              </Tooltip>
+            </Grid>
+          </Grid>
+
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <Typography variant="caption">
+              <strong>Example:</strong> If threshold = 5 and total = 9, any 5 out of 9 trustees can decrypt results.
+            </Typography>
+          </Alert>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenDialog(false)} disabled={submitting}>
@@ -322,6 +462,132 @@ export default function Elections() {
             disabled={submitting || !formData.title.trim() || !formData.start_time || !formData.end_time}
           >
             {submitting ? <CircularProgress size={24} /> : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Election Dialog */}
+      <Dialog open={openEditDialog} onClose={() => !submitting && setOpenEditDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Election</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Election Title"
+            fullWidth
+            required
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            disabled={submitting}
+          />
+          <TextField
+            margin="dense"
+            label="Description"
+            fullWidth
+            multiline
+            rows={3}
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            disabled={submitting}
+          />
+          <TextField
+            margin="dense"
+            label="Start Time"
+            type="datetime-local"
+            fullWidth
+            required
+            InputLabelProps={{ shrink: true }}
+            value={formData.start_time}
+            onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+            disabled={submitting}
+          />
+          <TextField
+            margin="dense"
+            label="End Time"
+            type="datetime-local"
+            fullWidth
+            required
+            InputLabelProps={{ shrink: true }}
+            value={formData.end_time}
+            onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+            disabled={submitting}
+          />
+          
+          <Box sx={{ mt: 2, mb: 1 }}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              🔐 Threshold Cryptography Settings
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+              Adjust trustee requirements. Make sure you have enough trustees added!
+            </Typography>
+          </Box>
+
+          <Grid container spacing={2}>
+            <Grid item xs={6}>
+              <Tooltip title="Minimum number of trustees needed to decrypt results. Lower = less secure but more fault-tolerant.">
+                <TextField
+                  margin="dense"
+                  label="Threshold (t)"
+                  type="number"
+                  fullWidth
+                  required
+                  value={formData.threshold_t}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 1
+                    setFormData({ 
+                      ...formData, 
+                      threshold_t: Math.max(1, Math.min(val, formData.total_trustees_n))
+                    })
+                  }}
+                  disabled={submitting}
+                  inputProps={{ min: 1, max: formData.total_trustees_n }}
+                  helperText="Min trustees to decrypt"
+                />
+              </Tooltip>
+            </Grid>
+            <Grid item xs={6}>
+              <Tooltip title="Total number of trustees. Must be >= threshold. More trustees = better redundancy.">
+                <TextField
+                  margin="dense"
+                  label="Total Trustees (n)"
+                  type="number"
+                  fullWidth
+                  required
+                  value={formData.total_trustees_n}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 1
+                    setFormData({ 
+                      ...formData, 
+                      total_trustees_n: Math.max(formData.threshold_t, val)
+                    })
+                  }}
+                  disabled={submitting}
+                  inputProps={{ min: formData.threshold_t }}
+                  helperText="Total trustee shares"
+                />
+              </Tooltip>
+            </Grid>
+          </Grid>
+
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            <Typography variant="caption">
+              <strong>Warning:</strong> Make sure you have {formData.total_trustees_n} trustees added before initiating key ceremony!
+            </Typography>
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setOpenEditDialog(false)
+            setEditingElection(null)
+          }} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleUpdate} 
+            variant="contained" 
+            disabled={submitting || !formData.title.trim() || !formData.start_time || !formData.end_time}
+          >
+            {submitting ? <CircularProgress size={24} /> : 'Update'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   Box,
   Paper,
@@ -29,6 +29,9 @@ import {
   Stop as StopIcon,
   Assessment as AssessmentIcon,
   Edit as EditIcon,
+  QrCode as QrCodeIcon,
+  Group as GroupIcon,
+  Security as SecurityIcon,
 } from '@mui/icons-material'
 import { electionApi } from '../services/api'
 import React from 'react'
@@ -54,6 +57,7 @@ interface Election {
 
 export default function ElectionDetails() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [election, setElection] = useState<Election | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -243,6 +247,49 @@ export default function ElectionDetails() {
             <Typography variant="body2" gutterBottom>
               <strong>Total Trustees (n):</strong> {election.total_trustees_n}
             </Typography>
+
+            <Divider sx={{ my: 2 }} />
+
+            <Typography variant="subtitle2" gutterBottom color="text.secondary">
+              Election Management
+            </Typography>
+            <Box display="flex" flexDirection="column" gap={1} mt={2}>
+              {election.status === 'TALLIED' && (
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<AssessmentIcon />}
+                  onClick={() => navigate(`/results/${id}`)}
+                  fullWidth
+                >
+                  View Results
+                </Button>
+              )}
+              <Button
+                variant="outlined"
+                startIcon={<QrCodeIcon />}
+                onClick={() => navigate(`/elections/${id}/codes`)}
+                fullWidth
+              >
+                Manage Voting Codes
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<GroupIcon />}
+                onClick={() => navigate(`/elections/${id}/trustees`)}
+                fullWidth
+              >
+                Manage Trustees
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<SecurityIcon />}
+                onClick={() => navigate(`/elections/${id}/bulletin`)}
+                fullWidth
+              >
+                View Bulletin Board
+              </Button>
+            </Box>
           </Paper>
         </Grid>
       </Grid>
