@@ -1,4 +1,4 @@
--- SecureVote E-Voting System Database Schema
+-- E-Vote E-Voting System Database Schema
 -- Group F: MUNASINGHE S.K. (210396E), JAYASOORIYA D.D.M. (210250D)
 -- Date: October 26, 2025
 
@@ -413,7 +413,7 @@ CREATE POLICY users_select_own ON users
 INSERT INTO users (nic, email, full_name, date_of_birth, is_admin, kyc_status, password_hash)
 VALUES (
     'ADMIN001',
-    'admin@securevote.com',
+    'admin@evote.com',
     'System Administrator',
     '1990-01-01',
     true,
