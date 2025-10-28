@@ -8,7 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
-from datetime import datetime
+from datetime import datetime, timezone
+from shared.audit_helper import audit_login
+import logging
+
+logger = logging.getLogger(__name__)
 from typing import Optional
 from app.config import settings
 from shared.database import get_db
@@ -96,9 +100,15 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     if not user or not user.password_hash or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+    # Update last login time (with timezone awareness)
+    user.last_login_at = datetime.now(timezone.utc)
+    print(f"[AUTH-SERVICE] Updating last_login_at for user {user.email}: {user.last_login_at}")
+    
+    # Generate tokens
     access_token = create_access_token(str(user.user_id))
     refresh_token = create_refresh_token(str(user.user_id))
 
+    # Create session
     session = SessionModel(
         user_id=user.user_id,
         access_token=access_token,
@@ -108,7 +118,22 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         expires_at=get_token_expiry("access")
     )
     db.add(session)
+    
+    # Commit both user update and session creation
     db.commit()
+    db.refresh(user)  # Refresh to ensure last_login_at is saved
+    print(f"[AUTH-SERVICE] Last login saved: {user.last_login_at}")
+    
+    # Log to audit trail
+    try:
+        audit_login(
+            db=db,
+            user_id=str(user.user_id),
+            ip_address=request.client.host if request.client else None,
+            success=True
+        )
+    except Exception as e:
+        logger.error(f"Failed to create login audit log: {e}")
 
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 

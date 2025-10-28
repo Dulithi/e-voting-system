@@ -4,6 +4,7 @@ Blind Signature API Routes - RSA Blind Signature Implementation
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from shared.database import get_db
 from app.utils.blind_signature import get_blind_signer
 from datetime import datetime
@@ -30,10 +31,10 @@ def request_signature(payload: BlindSignRequest, db: Session = Depends(get_db)):
     """
     # Validate main_voting_code exists and not used
     vc = db.execute(
-        """
+        text("""
         SELECT code_id, main_code_used FROM voting_codes 
         WHERE main_voting_code = :code AND election_id::text = :eid
-        """,
+        """),
         {"code": payload.main_voting_code, "eid": payload.election_id}
     ).fetchone()
     
@@ -56,27 +57,35 @@ def request_signature(payload: BlindSignRequest, db: Session = Depends(get_db)):
         # Compute token hash from blinded token (maintains anonymity)
         token_hash = hashlib.sha256(blinded_bytes).hexdigest()
         
-        # Store anonymous token record
+        # Store anonymous token record with blinded signature
         db.execute(
-            """
+            text("""
             INSERT INTO anonymous_tokens 
-            (election_id, token_hash, issued_at, is_used)
-            VALUES (:eid::uuid, :hash, :issued_at, FALSE)
-            """,
+            (election_id, token_hash, signed_blind_token, issued_at, is_used)
+            VALUES (CAST(:eid AS uuid), :hash, :sig, :issued_at, FALSE)
+            """),
             {
                 "eid": payload.election_id,
                 "hash": token_hash,
+                "sig": blinded_signature_bytes,  # Store the blinded signature
                 "issued_at": datetime.utcnow()
             }
         )
         
         # Mark main code used
         db.execute(
-            "UPDATE voting_codes SET main_code_used = true, main_code_used_at = now() WHERE code_id = :cid",
+            text("""
+            UPDATE voting_codes 
+            SET main_code_used = true, main_code_used_at = now() 
+            WHERE code_id = :cid
+            """),
             {"cid": vc[0]}
         )
         
         db.commit()
+        
+        print(f"[TOKEN-SERVICE] Blind signature issued for election {payload.election_id}")
+        print(f"[TOKEN-SERVICE] Token hash: {token_hash[:20]}...")
         
         return BlindSignResponse(
             blinded_signature=blinded_signature,
@@ -98,4 +107,69 @@ def get_public_key():
         "algorithm": "RSA-2048",
         "purpose": "Blind signature for anonymous voting tokens"
     }
+
+
+class CreateTokenDirectRequest(BaseModel):
+    election_id: str
+    token_hash: str
+
+
+@router.post("/create-direct")
+def create_token_direct(payload: CreateTokenDirectRequest, db: Session = Depends(get_db)):
+    """
+    Create anonymous token directly (simplified MVP approach)
+    Skips blind signature protocol for simplified implementation
+    """
+    print(f"[TOKEN-SERVICE] Creating token for election: {payload.election_id}")
+    print(f"[TOKEN-SERVICE] Token hash: {payload.token_hash[:16]}...")
+    
+    try:
+        # Check if token already exists
+        existing = db.execute(
+            text("""
+            SELECT token_id FROM anonymous_tokens 
+            WHERE token_hash = :th
+            """),
+            {"th": payload.token_hash}
+        ).fetchone()
+        
+        if existing:
+            print(f"[TOKEN-SERVICE] Token already exists: {existing[0]}")
+            return {
+                "message": "Token already exists",
+                "token_hash": payload.token_hash
+            }
+        
+        # Create token record
+        # For simplified MVP: Use token_hash as placeholder for signed_blind_token
+        placeholder_signature = bytes.fromhex(payload.token_hash)
+        
+        db.execute(
+            text("""
+            INSERT INTO anonymous_tokens 
+            (election_id, token_hash, signed_blind_token, issued_at, is_used)
+            VALUES (CAST(:eid AS uuid), :hash, :sig, :issued_at, FALSE)
+            """),
+            {
+                "eid": payload.election_id,
+                "hash": payload.token_hash,
+                "sig": placeholder_signature,
+                "issued_at": datetime.utcnow()
+            }
+        )
+        
+        db.commit()
+        
+        print(f"[TOKEN-SERVICE] Token created successfully")
+        
+        return {
+            "message": "Anonymous token created successfully",
+            "token_hash": payload.token_hash
+        }
+        
+    except Exception as e:
+        db.rollback()
+        print(f"[TOKEN-SERVICE] Error creating token: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create token: {str(e)}")
+
 

@@ -19,7 +19,6 @@ import {
   Dashboard as DashboardIcon,
   HowToVote as ElectionsIcon,
   People as PeopleIcon,
-  BarChart as ResultsIcon,
   Logout as LogoutIcon,
 } from '@mui/icons-material'
 import { useDispatch } from 'react-redux'
@@ -46,7 +45,6 @@ export default function Layout() {
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Elections', icon: <ElectionsIcon />, path: '/elections' },
     { text: 'Voters', icon: <PeopleIcon />, path: '/voters' },
-    { text: 'Results', icon: <ResultsIcon />, path: '/results' },
   ]
 
   const drawer = (

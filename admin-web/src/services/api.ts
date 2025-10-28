@@ -4,9 +4,9 @@ import axios from 'axios'
 const AUTH_SERVICE = 'http://localhost:8001'
 const TOKEN_SERVICE = 'http://localhost:8002'
 const VOTE_SERVICE = 'http://localhost:8003'
-const BULLETIN_SERVICE = 'http://localhost:8004'
+const BULLETIN_SERVICE = 'http://localhost:8004' // Bulletin board service
 const ELECTION_SERVICE = 'http://localhost:8005'
-const CODE_SHEET_SERVICE = 'http://localhost:8006'
+const CODE_SHEET_SERVICE = 'http://localhost:8006' // Code sheet service
 
 // Create axios instances for each service
 export const authApi = axios.create({

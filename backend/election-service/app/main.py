@@ -47,4 +47,4 @@ app.include_router(trustee_router, prefix="/api/trustee", tags=["Trustee"])
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    return {"status": "healthy", "service": "election-service"}
