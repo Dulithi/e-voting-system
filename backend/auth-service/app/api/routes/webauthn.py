@@ -24,7 +24,7 @@ def registration_options():
     return ChallengeResponse(
         challenge=os.urandom(16).hex(),
         rp_id="localhost",
-        rp_name="SecureVote E-Voting System"
+        rp_name="E-Vote E-Voting System"
     )
 
 
@@ -47,7 +47,7 @@ def authentication_options():
     return ChallengeResponse(
         challenge=os.urandom(16).hex(),
         rp_id="localhost",
-        rp_name="SecureVote E-Voting System"
+        rp_name="E-Vote E-Voting System"
     )
 
 

@@ -14,7 +14,7 @@ load_dotenv(dotenv_path=env_path)
 
 class Settings(BaseSettings):
     # Application
-    app_name: str = "SecureVote Authentication Service"
+    app_name: str = "E-Vote Authentication Service"
     app_version: str = "1.0.0"
     debug: bool = True
     
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     
     # WebAuthn
-    webauthn_rp_name: str = "SecureVote E-Voting System"
+    webauthn_rp_name: str = "E-Vote E-Voting System"
     webauthn_rp_id: str = "localhost"
     webauthn_origin: str = "http://localhost:5173"
     

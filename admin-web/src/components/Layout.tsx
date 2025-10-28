@@ -51,7 +51,7 @@ export default function Layout() {
     <div>
       <Toolbar>
         <Typography variant="h6" noWrap component="div">
-          SecureVote Admin
+          E-Vote Admin
         </Typography>
       </Toolbar>
       <Divider />
