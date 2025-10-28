@@ -147,9 +147,6 @@ CREATE TABLE trustees (
     shares_submitted BOOLEAN DEFAULT false,
     shares_submitted_at TIMESTAMP,
     
-    -- Status
-    status VARCHAR(20) DEFAULT 'INVITED' CHECK (status IN ('INVITED', 'ACCEPTED', 'KEY_GENERATED', 'ACTIVE')),
-    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     UNIQUE(election_id, user_id)

@@ -6,8 +6,18 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
 import os
+from pathlib import Path
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://evoting_admin:secure_password_123@localhost:5432/evoting_db")
+# Load .env from project root
+from dotenv import load_dotenv
+env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:StrongDatabase@201@localhost:5432/evoting_db")
+
+# Fix hostname for Windows (replace 'postgres' with 'localhost')
+if "@postgres:" in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("@postgres:", "@localhost:")
 
 # Convert postgresql:// to postgresql+psycopg:// for psycopg3 driver
 if DATABASE_URL.startswith("postgresql://"):

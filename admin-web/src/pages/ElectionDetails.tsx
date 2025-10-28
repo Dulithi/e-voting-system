@@ -17,8 +17,19 @@ import {
   Divider,
   CircularProgress,
   Alert,
+  Chip,
+  Menu,
+  MenuItem,
+  IconButton,
 } from '@mui/material'
-import { Add as AddIcon } from '@mui/icons-material'
+import { 
+  Add as AddIcon,
+  MoreVert as MoreVertIcon,
+  PlayArrow as PlayArrowIcon,
+  Stop as StopIcon,
+  Assessment as AssessmentIcon,
+  Edit as EditIcon,
+} from '@mui/icons-material'
 import { electionApi } from '../services/api'
 import React from 'react'
 
@@ -51,6 +62,8 @@ export default function ElectionDetails() {
     name: '',
     party: '',
   })
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
   useEffect(() => {
     loadElection()
@@ -86,6 +99,47 @@ export default function ElectionDetails() {
     }
   }
 
+  const handleStatusChange = async (newStatus: string) => {
+    try {
+      setUpdatingStatus(true)
+      await electionApi.put(`/election/${id}/status`, { status: newStatus })
+      setAnchorEl(null)
+      loadElection()
+    } catch (error: any) {
+      console.error('Failed to update status:', error)
+      alert(error.response?.data?.detail || 'Failed to update election status')
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return 'success'
+      case 'DRAFT':
+        return 'default'
+      case 'CLOSED':
+      case 'TALLIED':
+        return 'info'
+      default:
+        return 'default'
+    }
+  }
+
+  const getStatusMenuItems = () => {
+    if (!election) return []
+
+    const statuses = [
+      { value: 'DRAFT', label: 'Draft', icon: <EditIcon fontSize="small" />, description: 'Edit mode' },
+      { value: 'ACTIVE', label: 'Active', icon: <PlayArrowIcon fontSize="small" />, description: 'Open for voting' },
+      { value: 'CLOSED', label: 'Closed', icon: <StopIcon fontSize="small" />, description: 'Voting ended' },
+      { value: 'TALLIED', label: 'Tallied', icon: <AssessmentIcon fontSize="small" />, description: 'Results published' },
+    ]
+
+    return statuses.filter(s => s.value !== election.status)
+  }
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -112,9 +166,24 @@ export default function ElectionDetails() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        {election.title}
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4">
+          {election.title}
+        </Typography>
+        <Box display="flex" alignItems="center" gap={2}>
+          <Chip
+            label={election.status}
+            color={getStatusColor(election.status) as any}
+          />
+          <IconButton
+            onClick={(e) => setAnchorEl(e.currentTarget)}
+            disabled={updatingStatus}
+          >
+            <MoreVertIcon />
+          </IconButton>
+        </Box>
+      </Box>
+
       <Typography variant="body1" color="text.secondary" paragraph>
         {election.description || 'No description provided'}
       </Typography>
@@ -209,6 +278,36 @@ export default function ElectionDetails() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Status Change Menu */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={() => setAnchorEl(null)}
+      >
+        <MenuItem disabled sx={{ opacity: 1 }}>
+          <Typography variant="caption" color="text.secondary">
+            Change Status
+          </Typography>
+        </MenuItem>
+        {getStatusMenuItems().map((status) => (
+          <MenuItem
+            key={status.value}
+            onClick={() => handleStatusChange(status.value)}
+            disabled={updatingStatus}
+          >
+            <Box display="flex" alignItems="center" gap={1}>
+              {status.icon}
+              <Box>
+                <Typography variant="body2">{status.label}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {status.description}
+                </Typography>
+              </Box>
+            </Box>
+          </MenuItem>
+        ))}
+      </Menu>
     </Box>
   )
 }
